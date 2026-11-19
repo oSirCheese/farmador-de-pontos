@@ -1,0 +1,7 @@
+# configuração com senhas e acessos (NUNCA enviar)
+kick-timer.json
+*.json.bak
+# executáveis e pacotes
+*.exe
+*.antigo
+*.zip
