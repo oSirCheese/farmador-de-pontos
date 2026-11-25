@@ -72,13 +72,15 @@ var (
 const phrRows = 10
 
 // alturas (em 96 DPI) de cada aba, sem o rodapé
+const accCardH = 44 + nAccs*26 // cartão de contas (Twitch/Kick): título e uma linha por conta
+
 func tabHeight(t int) int {
 	switch t {
 	case 0:
 		if isAuthorized() {
-			return 84 + 146 + 6 + 146 + 6 + 52 // já autorizada: cartão pequeno, sem botão nem campos
+			return 84 + accCardH + 6 + accCardH + 6 + 52 // já autorizada: cartão pequeno, sem botão nem campos
 		}
-		return 84 + 146 + 6 + 146 + 6 + 160
+		return 84 + accCardH + 6 + accCardH + 6 + 160
 	case 1:
 		return 84 + 3*(146+6) + 14
 	}
@@ -146,7 +148,7 @@ func openSettings() {
 	}
 	cx, cw := sPadX()+10, sW-2*sPadX()-20
 	// Contas: campos da autorização para digitar (último cartão)
-	dY := 84 + 146 + 6 + 146 + 6
+	dY := 84 + accCardH + 6 + accCardH + 6
 	edClient = edit(cx, dY+64, cw, 28, c.ClientID, false)
 	edSecret = edit(cx, dY+114, cw, 28, c.ClientSecret, false)
 	sendMsg(edSecret, 0x00CC, '•', 0)
@@ -317,7 +319,7 @@ func paintSettings(c canvas) {
 	switch setTab {
 	case 0: // ----- Contas -----
 		y := 84
-		cardAt(y, 146)
+		cardAt(y, accCardH)
 		c.text(lx, S(y+18), "TWITCH · ASSISTIR", fLabel, cMuted)
 		// para saber quais lives estão ao vivo, basta um acesso oficial da Twitch (qualquer conta)
 		hasTok := false
@@ -337,7 +339,7 @@ func paintSettings(c canvas) {
 		case !hasTok:
 			btn(right-S(150), S(y+7), S(150), S(22), "Autorizar (lives ao vivo)", true, sTwLogin, 0)
 		}
-		for i := 0; i < 4; i++ {
+		for i := 0; i < nAccs; i++ {
 			ry := S(y + 44 + i*26)
 			a := cc.TwAccs[i]
 			hit(lx, ry-S(10), S(200), S(20), sTwWeb, i) // clicar no nome abre o login desta conta
@@ -358,26 +360,21 @@ func paintSettings(c canvas) {
 				c.textR(right, ry, "falta o WebView2", fSmall, cMuted)
 			case a.User == "":
 				btn(right-S(116), ry-S(11), S(116), S(22), "Entrar na Twitch", false, sTwWeb, i)
-			case i == 0:
-				w := c.measure("sempre ligada", fSmallBold) + S(16)
-				c.round(right-w, ry-S(10), w, S(20), S(10), cGold, cGold)
-				c.textBox(right-w, ry-S(10), w, S(20), "sempre ligada", fSmallBold, 0, DT_CENTER|DT_VCENTER|DT_SINGLELINE)
-			default:
-				lbl, fill, col := "Pausada", uintptr(cChip), uintptr(cText)
+			default: // botão Ligar / Pausar (nenhuma conta fica sempre ligada)
+				lbl, primary, st := "Ligar", true, "pausada"
 				if a.Watch {
-					lbl, fill, col = "Assistindo", cGold, 0
+					lbl, primary, st = "Pausar", false, "assistindo"
 				}
-				w := c.measure(lbl, fSmallBold) + S(16)
-				c.round(right-w, ry-S(10), w, S(20), S(10), fill, fill)
-				c.textBox(right-w, ry-S(10), w, S(20), lbl, fSmallBold, col, DT_CENTER|DT_VCENTER|DT_SINGLELINE)
-				hit(right-w, ry-S(10), w, S(20), sTwToggle, i)
+				w := c.measure(lbl, fBtn) + S(22)
+				btn(right-w, ry-S(11), w, S(22), lbl, primary, sTwToggle, i)
+				c.textR(right-w-S(8), ry, st, fSmall, cMuted)
 			}
 		}
 
-		y += 146 + 6
-		cardAt(y, 146)
+		y += accCardH + 6
+		cardAt(y, accCardH)
 		c.text(lx, S(y+18), "KICK · ASSISTIR", fLabel, cMuted)
-		for i := 0; i < 4; i++ {
+		for i := 0; i < nAccs; i++ {
 			ry := S(y + 44 + i*26)
 			a := cc.KickAccs[i]
 			hit(lx, ry-S(10), S(200), S(20), sKickLogin, i) // clicar no nome abre o login desta conta
@@ -400,23 +397,18 @@ func paintSettings(c canvas) {
 				c.textR(right, ry, "falta o WebView2", fSmall, cMuted)
 			case a.User == "":
 				btn(right-S(104), ry-S(11), S(104), S(22), "Entrar na Kick", false, sKickLogin, i)
-			case i == 0:
-				w := c.measure("sempre ligada", fSmallBold) + S(16)
-				c.round(right-w, ry-S(10), w, S(20), S(10), cGold, cGold)
-				c.textBox(right-w, ry-S(10), w, S(20), "sempre ligada", fSmallBold, 0, DT_CENTER|DT_VCENTER|DT_SINGLELINE)
-			default:
-				lbl, fill, col := "Pausada", uintptr(cChip), uintptr(cText)
+			default: // botão Ligar / Pausar (nenhuma conta fica sempre ligada)
+				lbl, primary, st := "Ligar", true, "pausada"
 				if a.Watch {
-					lbl, fill, col = "Assistindo", cGold, 0
+					lbl, primary, st = "Pausar", false, "assistindo"
 				}
-				w := c.measure(lbl, fSmallBold) + S(16)
-				c.round(right-w, ry-S(10), w, S(20), S(10), fill, fill)
-				c.textBox(right-w, ry-S(10), w, S(20), lbl, fSmallBold, col, DT_CENTER|DT_VCENTER|DT_SINGLELINE)
-				hit(right-w, ry-S(10), w, S(20), sKickToggle, i)
+				w := c.measure(lbl, fBtn) + S(22)
+				btn(right-w, ry-S(11), w, S(22), lbl, primary, sKickToggle, i)
+				c.textR(right-w-S(8), ry, st, fSmall, cMuted)
 			}
 		}
 
-		y += 146 + 6
+		y += accCardH + 6
 		if cc.RefreshToken != "" && !loggingIn { // já autorizada: só mostra quem digita
 			cardAt(y, 46)
 			c.text(lx, S(y+23), "DIGITAR", fLabel, cMuted)
@@ -457,7 +449,7 @@ func paintSettings(c canvas) {
 		}
 		for i, t := range titles {
 			y := 84 + i*152
-			cardAt(y, 146)
+			cardAt(y, accCardH)
 			w := c.text(lx, S(y+16), t.t, fLabel, cMuted)
 			if i == 2 {
 				c.text(lx+w+S(6), S(y+16), "oSirCheese", fSmallBold, cGold)

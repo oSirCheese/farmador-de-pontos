@@ -77,11 +77,14 @@ func importHub(path string) (string, error) {
 	}
 	cfg.TwChannels = cleanList(h.Twitch.Canais, false)
 	tok := 0
-	for i := 0; i < 4 && i < len(h.Twitch.Contas); i++ {
+	for i := 0; i < len(h.Twitch.Contas); i++ {
 		c := h.Twitch.Contas[i]
 		slot := i
 		if len(c.Slot) == 2 && c.Slot[0] == 't' && c.Slot[1] >= '1' && c.Slot[1] <= '4' {
 			slot = int(c.Slot[1] - '1')
+		}
+		if slot >= nAccs { // só a conta 01 é usada
+			continue
 		}
 		a := &cfg.TwAccs[slot]
 		a.Conta = c.Conta
@@ -94,7 +97,7 @@ func importHub(path string) (string, error) {
 		}
 	}
 	cfg.KickWatch = cleanList(h.Kick.Canais, true)
-	for i := 0; i < 4 && i < len(h.Kick.Contas); i++ {
+	for i := 0; i < nAccs && i < len(h.Kick.Contas); i++ {
 		c := h.Kick.Contas[i]
 		a := &cfg.KickAccs[i]
 		a.Conta = c.Conta
@@ -108,12 +111,13 @@ func importHub(path string) (string, error) {
 		}
 	}
 	cfg.KickAccs[0].Watch = true
-	cfg.LastImport = fmt.Sprintf("%s · %s · %d contas", filepath.Base(path), time.Now().Format("02/01 15:04"), max(len(h.Twitch.Contas), len(h.Kick.Contas)))
+	cfg.TwAccs[0].Watch = true
+	cfg.LastImport = fmt.Sprintf("%s · %s · %d contas", filepath.Base(path), time.Now().Format("02/01 15:04"), min(nAccs, max(len(h.Twitch.Contas), len(h.Kick.Contas))))
 	msg := fmt.Sprintf("Importado: %d canais da Twitch, %d da Kick, %d acessos da Twitch.", len(cfg.TwChannels), len(cfg.KickWatch), tok)
 	if tok == 0 {
-		msg += "\nO arquivo veio sem os acessos da Twitch: entre em cada conta em Contas."
+		msg += "\nO arquivo veio sem os acessos da Twitch: entre na conta em Contas."
 	}
-	msg += "\nNa Kick, cada conta precisa entrar uma vez (Contas → Entrar na Kick)."
+	msg += "\nNa Kick, a conta precisa entrar uma vez (Contas → Entrar na Kick)."
 	return msg, nil
 }
 
@@ -126,7 +130,7 @@ func migrateV2() {
 		}
 	}
 	if cfg.ProfVer < 1 { // v2.13: contas 02–04 mudaram de navegador; precisam entrar na Kick uma vez
-		for i := 1; i < 4; i++ {
+		for i := 1; i < nAccs; i++ {
 			cfg.KickAccs[i].User = ""
 		}
 		cfg.ProfVer = 1
@@ -143,9 +147,16 @@ func migrateV2() {
 			cfg.KickAccs[i].Pts = map[string]int{}
 		}
 	}
-	cfg.KickAccs[0].Watch = true
-	if cfg.KickSel < 0 || cfg.KickSel > 3 {
+	if cfg.ProfVer < 2 { // v3.4: a conta 01 deixou de ser "sempre ligada"; começa ligada, como estava
+		cfg.KickAccs[0].Watch = true
+		cfg.TwAccs[0].Watch = true
+		cfg.ProfVer = 2
+	}
+	if cfg.KickSel < 0 || cfg.KickSel >= nAccs {
 		cfg.KickSel = 0
+	}
+	if cfg.TwSel < 0 || cfg.TwSel >= nAccs {
+		cfg.TwSel = 0
 	}
 }
 

@@ -1,9 +1,9 @@
 # Farmador de pontos
 
-App para Windows (um único `.exe`, feito em Go) que acompanha lives da **Kick** e da **Twitch** e junta os pontos de canal de até 4 contas.
+App para Windows (um único `.exe`, feito em Go) que acompanha lives da **Kick** e da **Twitch** e junta os pontos de canal de uma conta em cada plataforma.
 
-- Abre as lives em páginas escondidas (WebView2): a conta 1 assiste sempre, as contas 2 a 4 podem ser ligadas e desligadas.
-- Mostra os pontos de cada canal, a soma, e destaca em dourado quem passou de 300 pontos.
+- Abre as lives em páginas escondidas (WebView2) com a conta 01, que você liga e pausa pelo botão Ligar/Pausar.
+- Mostra os pontos de cada canal e a soma, com cor por faixa: vermelho de 200 a 499, azul de 500 a 999 e amarelo a partir de 1000.
 - Clicar num canal abre a live para resgatar.
 - Pode mandar frases no chat da Kick, **só** em canais de streamers que permitiram, pela API oficial da Kick.
 - Medidor de memória/CPU ("PESO AGORA") e atualização automática a partir de um zip na pasta Downloads.

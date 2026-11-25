@@ -18,7 +18,7 @@ import (
 
 const (
 	appName    = "Farmador de pontos"
-	appVersion = "3.2"
+	appVersion = "3.4"
 	defaultMin = 30
 )
 
@@ -124,6 +124,20 @@ func parseSlug(s string) string {
 
 // ---------- textos ----------
 
+// ptsColor: cor dos pontos de um canal (200–499 vermelho, 500–999 azul, 1000+ amarelo).
+// Abaixo de 200 não tem cor (ok = false).
+func ptsColor(p int) (col uintptr, ok bool) {
+	switch {
+	case p >= 1000:
+		return cPts1000, true
+	case p >= 500:
+		return cPts500, true
+	case p >= 200:
+		return cPts200, true
+	}
+	return cMuted, false
+}
+
 func fmtPts(n int) string { // 1560 → 1.560
 	s := fmt.Sprint(n)
 	if n < 0 {
@@ -182,7 +196,7 @@ func liveList(s snapshot) (live []string, offline []string, errs []string) {
 }
 
 func kickWatching(s snapshot, i int) bool {
-	return (i == 0 || s.KickAccs[i].Watch) && s.KickAccs[i].User != ""
+	return s.KickAccs[i].Watch && s.KickAccs[i].User != ""
 }
 
 // fresh: o valor foi conferido há menos de 90 min (senão pode estar velho, ex.: já resgatado)
@@ -197,7 +211,7 @@ type platView struct {
 	chans      []string
 	live       map[string]bool
 	nlive      int
-	accs       [4]KickAcc
+	accs       [nAccs]KickAcc
 	sel        int
 	hover      bool
 }
@@ -207,7 +221,7 @@ func kickView(s snapshot) platView {
 }
 
 func twitchView(s snapshot) platView {
-	var accs [4]KickAcc
+	var accs [nAccs]KickAcc
 	for i, a := range s.TwAccsW {
 		accs[i] = KickAcc{Conta: a.Conta, Watch: a.Watch, User: a.User, Pts: a.Pts, PtsAt: a.PtsAt}
 	}
@@ -215,7 +229,7 @@ func twitchView(s snapshot) platView {
 }
 
 func pvWatching(pv platView, i int) bool {
-	return (i == 0 || pv.accs[i].Watch) && pv.accs[i].User != ""
+	return pv.accs[i].Watch && pv.accs[i].User != ""
 }
 
 func platWatching(pv platView) int {
@@ -382,7 +396,8 @@ func render(c canvas, s snapshot, collapsed bool) int {
 			slug string
 			x, y int
 			live bool
-			hot  bool
+			hot  bool // 200+ conferido há pouco: ganha a cor da faixa
+			col  uintptr
 			pts  string
 		}
 		var items []item
@@ -405,16 +420,17 @@ func render(c canvas, s snapshot, collapsed bool) int {
 			if ix > 0 && ix+w > maxW {
 				ix, iy = 0, iy+S(18)
 			}
-			items = append(items, item{dotc + ch, ch, ix, iy, pv.live[ch], ok && p >= 300 && fresh(pv.accs[sel], ch), ps})
+			pc, colored := ptsColor(p)
+			items = append(items, item{dotc + ch, ch, ix, iy, pv.live[ch], ok && colored && fresh(pv.accs[sel], ch), pc, ps})
 			ix += w + S(10)
 		}
 		listH := 0
 		if len(items) > 0 {
 			listH = iy + S(18)
 		}
-		kh := S(54) // fechado: título e contas
+		kh := S(54) // fechado: título e conta
 		if pv.hover {
-			kh = S(78) + listH
+			kh = S(54) + listH
 			if len(items) > 0 {
 				kh += S(24)
 			}
@@ -445,8 +461,10 @@ func render(c canvas, s snapshot, collapsed bool) int {
 			hits = append(hits, hitRect{x: right - S(130), y: l1 - S(10), w: S(130), h: S(20), id: hitGear})
 		case pv.plat == "tw" && s.TwLiveErr == "rede":
 			status = "sem conexão com a Twitch"
+		case pv.accs[sel].User == "":
+			status = "sem login"
 		case platWatching(pv) == 0:
-			status = "nenhuma conta"
+			status = "pausada"
 		}
 		if !pv.hover && len(items) > 0 {
 			aw := c.textR(right, l1, "▾", fSym, cMuted)
@@ -457,32 +475,20 @@ func render(c canvas, s snapshot, collapsed bool) int {
 
 		l2 := t + S(40)
 		xx = lx + c.text(lx, l2, "CONTA", fLabel, cMuted) + S(8)
-		for i := 0; i < 4; i++ {
-			label := fmt.Sprintf("%02d", i+1)
-			w := c.measure(label, fSmallBold) + S(26)
-			if i == sel {
-				c.round(xx, l2-S(11), w, S(22), S(10), cGold, cGold)
-				c.textBox(xx, l2-S(11), w, S(22), label, fSmallBold, 0, DT_CENTER|DT_VCENTER|DT_SINGLELINE)
-			} else {
-				c.round(xx, l2-S(11), w, S(22), S(10), cChip, cChip)
-				dc := uintptr(cDim)
-				if pvWatching(pv, i) {
-					dc = cGold
-				}
-				c.dot(xx+S(8), l2-S(3), S(7), dc)
-				c.text(xx+S(19), l2, label, fSmall, cText)
-			}
-			hits = append(hits, hitRect{x: xx, y: l2 - S(11), w: w, h: S(22), id: hitKickSel, n: i, s: pv.plat})
-			xx += w + S(5)
+		acc := pv.accs[sel]
+		accName := acc.Conta
+		if accName == "" {
+			accName = acc.User
 		}
-		switch a := pv.accs[sel]; {
-		case sel == 0:
-			c.textR(right, l2, "sempre ligada", fSmall, cMuted)
-		case a.User == "":
+		if accName == "" {
+			accName = fmt.Sprintf("Conta %02d", sel+1)
+		}
+		c.text(xx, l2, accName, fSmallBold, cText)
+		if acc.User == "" {
 			c.textR(right, l2, "sem login", fSmall, cMuted)
-		default: // pausar / ligar a conta escolhida (02–04)
+		} else { // ligar / pausar a conta (assistir as lives)
 			lbl, primary := "Pausar", false
-			if !a.Watch {
+			if !acc.Watch {
 				lbl, primary = "Ligar", true
 			}
 			bw := c.measure(lbl, fBtn) + S(22)
@@ -490,30 +496,8 @@ func render(c canvas, s snapshot, collapsed bool) int {
 			hits = append(hits, hitRect{x: right - bw, y: l2 - S(11), w: bw, h: S(22), id: hitKickToggle, n: sel, s: pv.plat})
 		}
 
-		l3 := t + S(64)
-		if pv.hover {
-			xx = lx
-			for i, a := range pv.accs {
-				sum := 0
-				for _, ch := range pv.chans {
-					sum += a.Pts[ch]
-				}
-				if i > 0 {
-					xx += c.text(xx, l3, " · ", fSmall, cMuted)
-				}
-				xx += c.text(xx, l3, fmt.Sprintf("%02d ", i+1), fSmall, cText)
-				switch {
-				case a.User == "":
-					xx += c.text(xx, l3, "sem login", fSmall, cMuted)
-				case !pvWatching(pv, i):
-					xx += c.text(xx, l3, fmtPts(sum)+" (pausada)", fSmall, cMuted)
-				default:
-					xx += c.text(xx, l3, fmtPts(sum), fSmallBold, cGold)
-				}
-			}
-		}
 		if pv.hover && len(items) > 0 {
-			base := t + S(78)
+			base := t + S(54)
 			for _, it := range items {
 				col := uintptr(cMuted)
 				if it.live {
@@ -521,20 +505,20 @@ func render(c canvas, s snapshot, collapsed bool) int {
 				}
 				font := fSmall
 				if it.hot {
-					col, font = cGold, fSmallBold
+					col, font = it.col, fSmallBold
 				}
 				iy := base + it.y + S(9)
 				w := c.text(lx+it.x, iy, it.txt, font, col)
 				if it.pts != "" {
 					pc := uintptr(cMuted)
 					if it.hot {
-						pc = cGold
+						pc = it.col
 					}
 					w += S(4) + c.text(lx+it.x+w+S(4), iy, it.pts, font, pc)
 				}
 				hits = append(hits, hitRect{x: lx + it.x, y: base + it.y, w: w, h: S(18), id: hitKickChan, n: sel, s: pv.plat + "|" + it.slug})
 			}
-			c.text(lx, base+listH+S(11), "Dourado: 300+ conferido há pouco · clique para abrir e resgatar", fSmall, cMuted)
+			c.text(lx, base+listH+S(11), "Vermelho 200+ · Azul 500+ · Amarelo 1000+ · clique para abrir e resgatar", fSmall, cMuted)
 		}
 	}
 	drawPlat(twitchView(s))
@@ -769,19 +753,6 @@ func mainProc(h uintptr, m uint32, w, l uintptr) uintptr {
 					}
 				case hitStart:
 					toggleSending()
-				case hitKickSel:
-					cfgMu.Lock()
-					if r.s == "tw" {
-						cfg.TwSel = r.n
-					} else {
-						cfg.KickSel = r.n
-					}
-					cfgMu.Unlock()
-					saveConfig()
-					refreshMain()
-				case hitKickChan:
-					plat, slug, _ := strings.Cut(r.s, "|")
-					kickOpenWindow(plat, r.n, slug)
 				case hitKickToggle:
 					cfgMu.Lock()
 					if r.s == "tw" {
@@ -793,6 +764,9 @@ func mainProc(h uintptr, m uint32, w, l uintptr) uintptr {
 					saveConfig()
 					pPostMessageW.Call(hwndMain, wmKickSync, 0, 0)
 					refreshMain()
+				case hitKickChan:
+					plat, slug, _ := strings.Cut(r.s, "|")
+					kickOpenWindow(plat, r.n, slug)
 				case hitUpdate:
 					applyFoundUpdate(hwndMain)
 				}

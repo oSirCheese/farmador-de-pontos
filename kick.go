@@ -52,24 +52,27 @@ type Config struct {
 	ExpiresAt    int64    `json:"expires_at"`
 	Username     string   `json:"username"`
 	// v2.0+: lives (Twitch no chat, Kick assistindo) e frases marcáveis
-	Phrases    []Phrase   `json:"phrases"`
-	TwClientID string     `json:"tw_client_id"`
-	TwChannels []string   `json:"tw_channels"`
-	TwAccs     [4]TwAcc   `json:"tw_accs"`
-	KickWatch  []string   `json:"kick_watch"`
-	KickAccs   [4]KickAcc `json:"kick_accs"`
-	KickSel    int        `json:"kick_sel"`
-	TwSel      int        `json:"tw_sel"`
-	LastImport string     `json:"last_import"`
+	Phrases    []Phrase       `json:"phrases"`
+	TwClientID string         `json:"tw_client_id"`
+	TwChannels []string       `json:"tw_channels"`
+	TwAccs     [nAccs]TwAcc   `json:"tw_accs"`
+	KickWatch  []string       `json:"kick_watch"`
+	KickAccs   [nAccs]KickAcc `json:"kick_accs"`
+	KickSel    int            `json:"kick_sel"`
+	TwSel      int            `json:"tw_sel"`
+	LastImport string         `json:"last_import"`
 	// v1.6+
 	CfgVer    int  `json:"cfg_ver"`
-	ProfVer   int  `json:"prof_ver"`  // 1 = contas 02–04 já em perfis do navegador compartilhado
+	ProfVer   int  `json:"prof_ver"`  // 1 = contas 02–04 já em perfis do navegador compartilhado · 2 = conta 01 com botão Ligar
 	Sending   bool `json:"sending"`   // estava "Rodando" ao fechar → volta rodando
 	Collapsed bool `json:"collapsed"` // balão minimizado
 	X         int  `json:"x"`
 	Y         int  `json:"y"`
 	HasPos    bool `json:"has_pos"`
 }
+
+// nAccs: o app usa só a conta 01 na Kick e na Twitch (as contas 02–04 saíram na v3.3).
+const nAccs = 1
 
 type Phrase struct {
 	Text string `json:"text"`
@@ -82,7 +85,7 @@ type TwAcc struct {
 	Access  string `json:"access"`
 	Refresh string `json:"refresh"`
 	// v3.0: assistir na Twitch igual à Kick (página da live aberta)
-	Watch bool             `json:"watch"`  // a 01 assiste sempre
+	Watch bool             `json:"watch"`  // assistindo as lives (botão Ligar/Pausar)
 	User  string           `json:"user"`   // logada no site da Twitch (nome detectado na página)
 	Pts   map[string]int   `json:"pts"`    // último valor de pontos por canal
 	PtsAt map[string]int64 `json:"pts_at"` // quando cada valor foi conferido (unix)
@@ -90,7 +93,7 @@ type TwAcc struct {
 
 type KickAcc struct {
 	Conta string           `json:"conta"`
-	Watch bool             `json:"watch"`  // a 01 assiste sempre
+	Watch bool             `json:"watch"`  // assistindo as lives (botão Ligar/Pausar)
 	User  string           `json:"user"`   // nome na Kick detectado na página
 	Pts   map[string]int   `json:"pts"`    // último valor de pontos por canal
 	PtsAt map[string]int64 `json:"pts_at"` // quando cada valor foi conferido (unix)

@@ -155,12 +155,12 @@ func measureWeight() {
 	}
 	cfgMu.Lock()
 	var accLines []string
-	for i := 0; i < 4; i++ {
+	for i := 0; i < nAccs; i++ {
 		st := func(user string, watch bool) string {
 			switch {
 			case user == "":
 				return "sem login"
-			case i == 0 || watch:
+			case watch:
 				return "assistindo"
 			}
 			return "pausada"

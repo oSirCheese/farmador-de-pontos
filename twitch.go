@@ -30,11 +30,11 @@ type twStatus struct {
 
 var (
 	twMu      sync.Mutex
-	twStat    [4]twStatus
+	twStat    [nAccs]twStatus
 	twLive    []string
-	twStop    [4]chan struct{}
+	twStop    [nAccs]chan struct{}
 	twGen     int
-	twLogging [4]bool
+	twLogging [nAccs]bool
 )
 
 func twSet(i int, st string) {
@@ -131,7 +131,7 @@ func twGoodToken(i int) (string, string) {
 	return "", ""
 }
 
-// twApply (re)inicia as 4 conexões com a lista atual de canais.
+// twApply (re)inicia as conexões com a lista atual de canais.
 func twApply() {
 	twMu.Lock()
 	for i := range twStop {
@@ -143,12 +143,12 @@ func twApply() {
 	twGen++
 	cfgMu.Lock()
 	chans := append([]string(nil), cfg.TwChannels...)
-	var has [4]bool
+	var has [nAccs]bool
 	for i := range cfg.TwAccs {
 		has[i] = cfg.TwAccs[i].Access != ""
 	}
 	cfgMu.Unlock()
-	for i := 0; i < 4; i++ {
+	for i := 0; i < nAccs; i++ {
 		switch {
 		case !has[i]:
 			twStat[i].State = "sem login"

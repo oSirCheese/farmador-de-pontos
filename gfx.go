@@ -23,6 +23,10 @@ const (
 	cField     = 0x00262626
 	cFieldLine = 0x00444444
 	cRed       = 0x006B6BFF // #FF6B6B
+	// cores dos pontos: 200–499 vermelho, 500–999 azul, 1000+ amarelo
+	cPts200    = 0x004D4DFF // #FF4D4D
+	cPts500    = 0x00FFA04D // #4DA0FF
+	cPts1000   = 0x0033E0FF // #FFE033
 	cBtn2      = 0x00383838
 	cBtn2Press = 0x002C2C2C
 )

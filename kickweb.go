@@ -251,7 +251,7 @@ func newKickPage(plat string, acct int, slug string, visible bool) *kickPage {
 	ch.MessageCallback = func(m string) { kickMessage(p, m) }
 	var ok bool
 	if acct > 0 && profilesOK() {
-		// contas 02–04: perfil dentro do navegador compartilhado (pasta da conta 01)
+		// contas 02 em diante: perfil dentro do navegador compartilhado (pasta da conta 01)
 		ok = embedProfile(ch, p.hwnd, fmt.Sprintf("kick%02d", acct+1))
 	} else {
 		if acct > 0 { // Edge antigo: um navegador por conta (jeito anterior)
@@ -391,14 +391,14 @@ func kickSync() {
 	want := map[string]bool{}
 	cfgMu.Lock()
 	for i, a := range cfg.KickAccs {
-		if (i == 0 || a.Watch) && a.User != "" {
+		if a.Watch && a.User != "" {
 			for _, s := range live {
 				want[kickKey("kick", i, s)] = true
 			}
 		}
 	}
 	for i, a := range cfg.TwAccs {
-		if (i == 0 || a.Watch) && a.User != "" {
+		if a.Watch && a.User != "" {
 			for _, s := range twl {
 				want[kickKey("tw", i, s)] = true
 			}

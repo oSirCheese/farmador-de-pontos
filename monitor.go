@@ -53,15 +53,15 @@ type snapshot struct {
 	PhrOn     int
 	PhrAll    int
 	// lives
-	TwStat    [4]twStatus
+	TwStat    [nAccs]twStatus
 	TwLive    int
 	TwChans   int
-	TwNames   [4]string
+	TwNames   [nAccs]string
 	KickWatch []string
 	KickLive  map[string]bool
-	KickAccs  [4]KickAcc
+	KickAccs  [nAccs]KickAcc
 	KickSel   int
-	TwAccsW   [4]TwAcc
+	TwAccsW   [nAccs]TwAcc
 	TwSel     int
 	TwWatch   []string
 	TwLiveSet map[string]bool
