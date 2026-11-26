@@ -4,8 +4,10 @@ package main
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,6 +103,19 @@ func cleanupUpdate() {
 		return
 	}
 	os.Remove(exe + ".antigo")
+	// zips baixados do GitHub que já foram instalados (ou são mais velhos)
+	ents, _ := os.ReadDir(ghUpdDir())
+	for _, e := range ents {
+		if m := updZipRe.FindStringSubmatch(e.Name()); m != nil {
+			v := m[1] + "." + m[2]
+			if m[3] != "" {
+				v += "." + m[3]
+			}
+			if !verNewer(v, appVersion) {
+				os.Remove(filepath.Join(ghUpdDir(), e.Name()))
+			}
+		}
+	}
 }
 
 // updateFromZip troca o .exe pelo que está dentro do zip e reabre o Farmador.
@@ -233,8 +248,11 @@ func scanUpdate() {
 	for _, f := range []struct {
 		id    *guid
 		where string
-	}{{&folderDownloads, "Downloads"}, {&folderDesktop, "Área de Trabalho"}} {
-		dir := knownFolder(f.id)
+	}{{&folderDownloads, "Downloads"}, {&folderDesktop, "Área de Trabalho"}, {nil, "GitHub"}} {
+		dir := ghUpdDir()
+		if f.id != nil {
+			dir = knownFolder(f.id)
+		}
 		if dir == "" {
 			continue
 		}
@@ -277,6 +295,96 @@ func scanUpdate() {
 }
 
 var updTried = map[string]bool{}
+
+// ---------- atualizar sozinho pelos Releases do GitHub ----------
+// A cada 3 h pergunta ao GitHub qual é o Release mais novo. Se for mais novo que
+// este, baixa o zip para a pasta do Farmador em %LOCALAPPDATA%; o scanUpdate acha
+// o zip lá e instala sozinho, igual ao zip em Downloads.
+
+const ghLatest = "https://api.github.com/repos/oSirCheese/farmador-de-pontos/releases/latest"
+
+var ghHTTP = &http.Client{Timeout: 2 * time.Minute}
+
+func ghUpdDir() string { return filepath.Join(filepath.Dir(kickDataDir(0)), "atualizacao") }
+
+func ghUpdateLoop() {
+	time.Sleep(time.Minute) // deixa o Farmador abrir com calma
+	for {
+		ghCheckOnce()
+		time.Sleep(3 * time.Hour)
+	}
+}
+
+func ghCheckOnce() {
+	req, _ := http.NewRequest("GET", ghLatest, nil)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "Farmador-de-pontos/"+appVersion)
+	resp, err := ghHTTP.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return
+	}
+	var r struct {
+		Assets []struct {
+			Name string `json:"name"`
+			Size int64  `json:"size"`
+			URL  string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&r) != nil {
+		return
+	}
+	for _, a := range r.Assets {
+		m := updZipRe.FindStringSubmatch(a.Name)
+		if m == nil || !strings.HasPrefix(a.URL, "https://github.com/") {
+			continue
+		}
+		v := m[1] + "." + m[2]
+		if m[3] != "" {
+			v += "." + m[3]
+		}
+		if !verNewer(v, appVersion) {
+			continue
+		}
+		dir := ghUpdDir()
+		dst := filepath.Join(dir, filepath.Base(a.Name))
+		if st, err := os.Stat(dst); err == nil && st.Size() == a.Size {
+			return // já baixado: o scanUpdate cuida
+		}
+		os.MkdirAll(dir, 0o755)
+		ghDownload(a.URL, dst, a.Size)
+		return
+	}
+}
+
+func ghDownload(url, dst string, size int64) {
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Farmador-de-pontos/"+appVersion)
+	resp, err := ghHTTP.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return
+	}
+	tmp := dst + ".part" // o scanUpdate só olha .zip: não pega o arquivo pela metade
+	out, err := os.Create(tmp)
+	if err != nil {
+		return
+	}
+	n, err := io.Copy(out, io.LimitReader(resp.Body, 200<<20))
+	out.Close()
+	if err != nil || (size > 0 && n != size) {
+		os.Remove(tmp)
+		return
+	}
+	os.Remove(dst)
+	os.Rename(tmp, dst)
+}
 
 func updFoundInfo() (string, string) {
 	updMu.Lock()

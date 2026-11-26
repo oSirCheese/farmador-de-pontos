@@ -128,7 +128,8 @@ func monitor() {
 	tick := time.NewTicker(time.Minute)
 	defer tick.Stop()
 	n := 0
-	go func() { // zip de versão nova em Downloads / Área de Trabalho: confere a cada 5 s (só lê duas pastas)
+	go ghUpdateLoop() // Release novo no GitHub: confere a cada 3 h e baixa o zip
+	go func() { // zip de versão nova em Downloads / Área de Trabalho / baixado do GitHub: confere a cada 5 s
 		for {
 			scanUpdate()
 			time.Sleep(5 * time.Second)

@@ -6,7 +6,14 @@ App para Windows (um único `.exe`, feito em Go) que acompanha lives da **Kick**
 - Mostra os pontos de cada canal e a soma, com cor por faixa: vermelho de 200 a 499, azul de 500 a 999 e amarelo a partir de 1000.
 - Clicar num canal abre a live para resgatar.
 - Pode mandar frases no chat da Kick, **só** em canais de streamers que permitiram, pela API oficial da Kick.
-- Medidor de memória/CPU ("PESO AGORA") e atualização automática a partir de um zip na pasta Downloads.
+- Medidor de memória/CPU ("PESO AGORA").
+- Atualização automática: a cada 3 h confere o Release mais novo deste repositório e se instala sozinho. Um zip `farmador-osircheese-vX.Y.Z.zip` mais novo em Downloads ou na Área de Trabalho também é instalado sozinho.
+
+## Publicar uma versão nova
+
+1. Suba `appVersion` em `main.go` e compile.
+2. Zipe o `.exe` como `farmador-osircheese-vX.Y.Z.zip`.
+3. `gh release create vX.Y.Z farmador-osircheese-vX.Y.Z.zip --title "vX.Y.Z"`: em até 3 h os Farmadores abertos se atualizam.
 
 ## Requisitos
 
