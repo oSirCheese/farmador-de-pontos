@@ -245,17 +245,17 @@ func platWatching(pv platView) int {
 func platHot(pv platView) int {
 	n := 0
 	for _, c := range pv.chans {
-		if p, ok := pv.accs[pv.sel].Pts[c]; ok && p >= 300 && fresh(pv.accs[pv.sel], c) {
+		if p, ok := pv.accs[pv.sel].Pts[c]; ok && p >= 200 && fresh(pv.accs[pv.sel], c) {
 			n++
 		}
 	}
 	return n
 }
 
-func kickHot(s snapshot) int { // canais com 300+ na conta selecionada
+func kickHot(s snapshot) int { // canais com 200+ na conta selecionada
 	n := 0
 	for _, c := range s.KickWatch {
-		if p, ok := s.KickAccs[s.KickSel].Pts[c]; ok && p >= 300 && fresh(s.KickAccs[s.KickSel], c) {
+		if p, ok := s.KickAccs[s.KickSel].Pts[c]; ok && p >= 200 && fresh(s.KickAccs[s.KickSel], c) {
 			n++
 		}
 	}
@@ -337,7 +337,7 @@ func render(c canvas, s snapshot, collapsed bool) int {
 		for _, pv := range []platView{twitchView(s), kickView(s)} {
 			pv := pv
 			row(pv.name, fmt.Sprintf("%d ao vivo", pv.nlive), func(r, cy int) {
-				w := c.textR(r, cy, fmt.Sprintf("%d com 300+", platHot(pv)), fSmallBold, cGold)
+				w := c.textR(r, cy, fmt.Sprintf("%d com 200+", platHot(pv)), fSmallBold, cGold)
 				c.textR(r-w, cy, fmt.Sprintf("%d assistindo · ", platWatching(pv)), fSmall, cMuted)
 			})
 		}
@@ -396,7 +396,7 @@ func render(c canvas, s snapshot, collapsed bool) int {
 			slug string
 			x, y int
 			live bool
-			hot  bool // 200+ conferido há pouco: ganha a cor da faixa
+			hot  bool // 200+: ganha a cor da faixa (negrito só se ao vivo)
 			col  uintptr
 			pts  string
 		}
@@ -421,7 +421,7 @@ func render(c canvas, s snapshot, collapsed bool) int {
 				ix, iy = 0, iy+S(18)
 			}
 			pc, colored := ptsColor(p)
-			items = append(items, item{dotc + ch, ch, ix, iy, pv.live[ch], ok && colored && fresh(pv.accs[sel], ch), pc, ps})
+			items = append(items, item{dotc + ch, ch, ix, iy, pv.live[ch], ok && colored, pc, ps})
 			ix += w + S(10)
 		}
 		listH := 0
@@ -432,7 +432,7 @@ func render(c canvas, s snapshot, collapsed bool) int {
 		if pv.hover {
 			kh = S(54) + listH
 			if len(items) > 0 {
-				kh += S(24)
+				kh += S(42)
 			}
 		}
 		t := card(kh)
@@ -505,7 +505,10 @@ func render(c canvas, s snapshot, collapsed bool) int {
 				}
 				font := fSmall
 				if it.hot {
-					col, font = it.col, fSmallBold
+					col = it.col
+					if it.live {
+						font = fSmallBold
+					}
 				}
 				iy := base + it.y + S(9)
 				w := c.text(lx+it.x, iy, it.txt, font, col)
@@ -518,7 +521,8 @@ func render(c canvas, s snapshot, collapsed bool) int {
 				}
 				hits = append(hits, hitRect{x: lx + it.x, y: base + it.y, w: w, h: S(18), id: hitKickChan, n: sel, s: pv.plat + "|" + it.slug})
 			}
-			c.text(lx, base+listH+S(11), "Vermelho 200+ · Azul 500+ · Amarelo 1000+ · clique para abrir e resgatar", fSmall, cMuted)
+			c.text(lx, base+listH+S(11), "Vermelho 200+ · Azul 500+ · Amarelo 1000+ · negrito = ao vivo", fSmall, cMuted)
+			c.text(lx, base+listH+S(29), "Clique para abrir e resgatar", fSmall, cMuted)
 		}
 	}
 	drawPlat(twitchView(s))
