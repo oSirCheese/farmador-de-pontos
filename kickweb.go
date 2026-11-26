@@ -310,9 +310,9 @@ func newKickPage(plat string, acct int, slug string, visible bool) *kickPage {
 	case plat == "tw":
 		ch.Init(twWatchJS)
 	case visible:
-		ch.Init(kickNetJS + "\n" + kickLoginJS)
+		ch.Init(kickNetJS + "\n" + kickPollJS + "\n" + kickLoginJS)
 	default:
-		ch.Init(kickNetJS + "\n" + kickWatchJS)
+		ch.Init(kickNetJS + "\n" + kickPollJS + "\n" + kickWatchJS)
 	}
 	u := "https://kick.com/"
 	if plat == "tw" {
@@ -369,26 +369,26 @@ func kickMessage(p *kickPage, m string) {
 		ptsLog(p, "rede vista", n, o.U+mine)
 		return
 	}
+	if o.T == "ptsall" { // saldos pedidos direto à Kick (kickPollJS)
+		kickPollResult(p, m)
+		return
+	}
 	if o.T == "ptsnet" {
 		p.netPts = true
 		o.T = "pts"
-	} else if o.T == "pts" && p.netPts {
-		if o.N != nil {
-			ptsLog(p, "tela", fmt.Sprint(*o.N), "ignorado: já veio pela rede")
-		}
-		return
+	} else if o.T == "pts" && p.plat == "kick" && (p.netPts || apiFresh(p.slug)) {
+		return // o número da tela pode ser velho: já há o saldo vindo do servidor
 	}
 	cfgMu.Lock()
 	var user *string
 	var pts *map[string]int
 	var at *map[string]int64
-	var resg *map[string]bool
 	if p.plat == "tw" {
 		a := &cfg.TwAccs[p.acct]
-		user, pts, at, resg = &a.User, &a.Pts, &a.PtsAt, &a.Resg
+		user, pts, at = &a.User, &a.Pts, &a.PtsAt
 	} else {
 		a := &cfg.KickAccs[p.acct]
-		user, pts, at, resg = &a.User, &a.Pts, &a.PtsAt, &a.Resg
+		user, pts, at = &a.User, &a.Pts, &a.PtsAt
 	}
 	switch o.T {
 	case "pts":
@@ -396,37 +396,19 @@ func kickMessage(p *kickPage, m string) {
 			if *pts == nil {
 				*pts = map[string]int{}
 			}
-			if *resg == nil {
-				*resg = map[string]bool{}
+			old := (*pts)[p.slug]
+			(*pts)[p.slug] = *o.N
+			if *at == nil {
+				*at = map[string]int64{}
 			}
-			old, had := (*pts)[p.slug]
-			src := "tela"
-			if p.netPts {
-				src = "rede"
-			}
-			keep := true
-			switch {
-			case p.visible: // janela aberta por você (resgatar): é o valor de verdade
-				(*resg)[p.slug] = true
-			case p.checker:
-				// canal offline não ganha pontos: depois de um resgate no app, um número
-				// MAIOR na conferência é valor velho da Kick, não pontos novos
-				if (*resg)[p.slug] && had && *o.N > old {
-					keep = false
+			(*at)[p.slug] = time.Now().Unix()
+			kDirty = true
+			if old != *o.N {
+				src := "tela"
+				if p.netPts {
+					src = "rede"
 				}
-			default: // assistindo ao vivo: pode ter ganhado pontos de verdade
-				delete(*resg, p.slug)
-			}
-			if keep {
-				(*pts)[p.slug] = *o.N
-				if *at == nil {
-					*at = map[string]int64{}
-				}
-				(*at)[p.slug] = time.Now().Unix()
-				kDirty = true
 				ptsLog(p, src, fmt.Sprint(*o.N), fmt.Sprintf("antes %d", old))
-			} else {
-				ptsLog(p, src, fmt.Sprint(*o.N), fmt.Sprintf("ignorado: maior que %d depois do resgate", old))
 			}
 		}
 	case "user":
@@ -462,6 +444,10 @@ func ptsLog(p *kickPage, src, n, note string) {
 	case p.checker:
 		kind = "conferência"
 	}
+	ptsLogLine(platName(p.plat), kind, p.slug, src, n, note)
+}
+
+func ptsLogLine(plat, kind, slug, src, n, note string) {
 	path := filepath.Join(filepath.Dir(kickDataDir(0)), "pontos.log")
 	os.MkdirAll(filepath.Dir(path), 0o755)
 	if st, err := os.Stat(path); err == nil && st.Size() > 512<<10 {
@@ -472,7 +458,7 @@ func ptsLog(p *kickPage, src, n, note string) {
 		return
 	}
 	fmt.Fprintf(f, "%s  %-6s %-12s %-16s %-11s %8s  %s\n", time.Now().Format("2006-01-02 15:04:05"),
-		platName(p.plat), kind, p.slug, src, n, note)
+		plat, kind, slug, src, n, note)
 	f.Close()
 }
 
@@ -658,6 +644,7 @@ func checkPlan() {
 	if !webviewOK {
 		return
 	}
+	kickAPI := apiWorking() // a consulta direta à Kick já traz todos os canais (kickpoll.go)
 	stMu.Lock()
 	live := map[string]bool{}
 	for _, c := range kickWatchLive {
@@ -672,7 +659,7 @@ func checkPlan() {
 	cfgMu.Lock()
 	var q []string
 	for i, a := range cfg.KickAccs {
-		if a.User == "" {
+		if a.User == "" || kickAPI {
 			continue
 		}
 		for _, c := range cfg.KickWatch {

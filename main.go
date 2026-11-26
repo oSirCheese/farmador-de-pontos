@@ -18,7 +18,7 @@ import (
 
 const (
 	appName    = "Farmador de pontos"
-	appVersion = "3.4.3"
+	appVersion = "3.4.4"
 	defaultMin = 30
 )
 
@@ -819,6 +819,8 @@ func mainProc(h uintptr, m uint32, w, l uintptr) uintptr {
 			kickWatchdog()
 		case 6:
 			checkPlan()
+		case 7:
+			pollTick()
 		case 3:
 			cfgMu.Lock()
 			d := kDirty
@@ -962,6 +964,7 @@ func main() {
 	pSetTimer.Call(hwndMain, 4, 60000, 0)                                                     // recarrega 1 página da Kick por minuto, se ela tiver 30+ min
 	pSetTimer.Call(hwndMain, 5, 3000, 0)                                                      // conferência de pontos: um canal por vez
 	pSetTimer.Call(hwndMain, 6, 30*60*1000, 0)                                                // conferência de pontos: nova rodada a cada 30 min
+	pSetTimer.Call(hwndMain, 7, 15000, 0)                                                     // saldo da Kick direto do servidor (kickpoll.go)
 	time.AfterFunc(2*time.Minute, func() { pPostMessageW.Call(hwndMain, wmCheckPlan, 0, 0) }) // primeira rodada logo depois de abrir
 	go monitor()
 	twApply()

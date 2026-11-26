@@ -89,7 +89,6 @@ type TwAcc struct {
 	User  string           `json:"user"`   // logada no site da Twitch (nome detectado na página)
 	Pts   map[string]int   `json:"pts"`    // último valor de pontos por canal
 	PtsAt map[string]int64 `json:"pts_at"` // quando cada valor foi conferido (unix)
-	Resg  map[string]bool  `json:"resg,omitempty"` // valor lido na janela de resgatar e o canal não voltou ao vivo desde então
 }
 
 type KickAcc struct {
@@ -98,7 +97,6 @@ type KickAcc struct {
 	User  string           `json:"user"`   // nome na Kick detectado na página
 	Pts   map[string]int   `json:"pts"`    // último valor de pontos por canal
 	PtsAt map[string]int64 `json:"pts_at"` // quando cada valor foi conferido (unix)
-	Resg  map[string]bool  `json:"resg,omitempty"` // idem TwAcc.Resg
 }
 
 var (
