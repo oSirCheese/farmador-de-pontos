@@ -18,7 +18,7 @@ import (
 
 const (
 	appName    = "Farmador de pontos"
-	appVersion = "3.4"
+	appVersion = "3.4.1"
 	defaultMin = 30
 )
 
@@ -30,6 +30,7 @@ const (
 	wmOffc      = WM_APP + 5
 	wmCheckDone = WM_APP + 6
 	wmCheckPlan = WM_APP + 7
+	wmAutoUpdate = WM_APP + 8
 )
 
 const (
@@ -840,6 +841,11 @@ func mainProc(h uintptr, m uint32, w, l uintptr) uintptr {
 		return 0
 	case wmCheckPlan:
 		checkPlan()
+		return 0
+	case wmAutoUpdate:
+		if !quitting {
+			applyFoundUpdate(hwndMain)
+		}
 		return 0
 	case wmKickSync:
 		kickSync()

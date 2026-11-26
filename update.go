@@ -252,6 +252,10 @@ func scanUpdate() {
 				v += "." + m[3]
 			}
 			if verNewer(v, appVersion) && (bestVer == "" || verNewer(v, bestVer)) {
+				// zip ainda sendo copiado/baixado: espera ficar parado alguns segundos
+				if info, err := e.Info(); err != nil || time.Since(info.ModTime()) < 5*time.Second {
+					continue
+				}
 				bestPath, bestVer, bestWhere = filepath.Join(dir, e.Name()), v, f.where
 			}
 		}
@@ -259,11 +263,20 @@ func scanUpdate() {
 	updMu.Lock()
 	changed := bestVer != updVer
 	updPath, updVer, updWhere = bestPath, bestVer, bestWhere
+	auto := bestPath != "" && !updTried[bestPath]
+	if auto {
+		updTried[bestPath] = true // tenta sozinho uma vez; se falhar, fica a faixa para clicar
+	}
 	updMu.Unlock()
 	if changed {
 		onUpdate()
 	}
+	if auto && hwndMain != 0 {
+		pPostMessageW.Call(hwndMain, wmAutoUpdate, 0, 0) // atualiza sozinho, na thread da janela
+	}
 }
+
+var updTried = map[string]bool{}
 
 func updFoundInfo() (string, string) {
 	updMu.Lock()
