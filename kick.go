@@ -261,6 +261,7 @@ func api(method, path string, payload any) ([]byte, int, error) {
 	if err := ensureToken(); err != nil {
 		return nil, 0, err
 	}
+	netRetried := false
 	for attempt := 0; attempt < 2; attempt++ {
 		var rd io.Reader
 		if payload != nil {
@@ -277,7 +278,15 @@ func api(method, path string, payload any) ([]byte, int, error) {
 		}
 		resp, err := httpc.Do(req)
 		if err != nil {
-			return nil, 0, err
+			// Conexão parada que a Kick já fechou (EOF/reset): tenta de novo uma vez.
+			// Só GET — repetir o POST do chat poderia mandar a mensagem duas vezes.
+			if method == "GET" && !netRetried {
+				netRetried = true
+				attempt--
+				time.Sleep(time.Second)
+				continue
+			}
+			return nil, 0, netErr(err)
 		}
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
@@ -290,6 +299,16 @@ func api(method, path string, payload any) ([]byte, int, error) {
 		return body, resp.StatusCode, nil
 	}
 	return nil, 401, errors.New("não autorizado")
+}
+
+// netErr tira o `Get "URL":` da frente do erro, deixando só o motivo
+// (a URL longa cortava o motivo na tela).
+func netErr(err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) && ue.Err != nil {
+		return ue.Err
+	}
+	return err
 }
 
 func fetchUsername() (string, error) {

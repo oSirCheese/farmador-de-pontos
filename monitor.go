@@ -290,7 +290,10 @@ func friendlyErr(s string) string {
 		return "Faça o login da Kick na engrenagem (configurações)"
 	case strings.Contains(l, "token http 4"), strings.Contains(l, "não autorizado"), strings.Contains(l, "http 401"):
 		return "Login expirou — entre de novo na engrenagem (configurações)"
-	case strings.Contains(l, "no such host"), strings.Contains(l, "dial tcp"), strings.Contains(l, "timeout"):
+	case strings.Contains(l, "no such host"), strings.Contains(l, "dial tcp"), strings.Contains(l, "timeout"),
+		strings.Contains(l, "eof"), strings.Contains(l, "connection reset"), strings.Contains(l, "forcibly closed"),
+		strings.Contains(l, "wsarecv"), strings.Contains(l, "wsasend"), strings.Contains(l, "broken pipe"),
+		strings.Contains(l, "connection refused"), strings.Contains(l, "network is unreachable"):
 		return "Sem conexão com a Kick — tentando de novo"
 	case strings.Contains(l, "não encontrado"):
 		return "canal não encontrado"
