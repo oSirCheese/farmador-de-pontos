@@ -18,7 +18,7 @@ import (
 
 const (
 	appName    = "Farmador de pontos"
-	appVersion = "3.4.2"
+	appVersion = "3.4.3"
 	defaultMin = 30
 )
 

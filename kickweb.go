@@ -65,6 +65,30 @@ const kickWatchJS = `(() => {
  setTimeout(who, 10000); setInterval(who, 30 * 60000);
 })();`
 
+// Kick, todas as páginas: escuta as respostas do servidor que falam de pontos.
+// O número desenhado na tela pode vir de um valor guardado (velho); a resposta da
+// rede é o saldo de agora. Só vale a resposta do canal da própria página.
+const kickNetJS = `(() => {
+ if (window.__farmNet) return; window.__farmNet = 1;
+ const post = o => { try { window.chrome.webview.postMessage(JSON.stringify(o)); } catch (e) {} };
+ const slug = () => (location.pathname.split('/')[1] || '').toLowerCase();
+ const num = v => typeof v === 'number' && isFinite(v) ? Math.floor(v) : (typeof v === 'string' && /^\d+$/.test(v) ? parseInt(v, 10) : null);
+ const pick = j => { if (!j || typeof j !== 'object') return null; const d = (j.data && typeof j.data === 'object' && !Array.isArray(j.data)) ? j.data : j;
+   for (const k of ['points', 'balance', 'points_balance', 'channel_points']) { const n = num(d[k]); if (n != null) return n; } return null; };
+ const seen = (u, j) => { u = String(u || ''); if (!/point/i.test(u)) return; if (typeof j === 'string') { try { j = JSON.parse(j); } catch (e) { return; } }
+   const s = slug(), n = pick(j), mine = !!s && new RegExp('/' + s.replace(/[^a-z0-9_-]/g, '') + '(/|\\?|$)', 'i').test(u);
+   post({ t: 'ptsurl', u: u.slice(0, 200), n, mine });
+   if (n != null && mine) post({ t: 'ptsnet', n }); };
+ const of = window.fetch;
+ if (of) window.fetch = function (...a) { const p = of.apply(this, a);
+   try { const u = String((a[0] && a[0].url) || a[0] || ''); if (/point/i.test(u)) p.then(r => r.clone().text()).then(t => seen(u, t)).catch(() => {}); } catch (e) {}
+   return p; };
+ const oo = XMLHttpRequest.prototype.open;
+ XMLHttpRequest.prototype.open = function (m, u, ...r) {
+   try { if (/point/i.test(String(u))) this.addEventListener('load', () => { try { seen(u, this.responseType === 'json' ? this.response : this.responseText); } catch (e) {} }); } catch (e) {}
+   return oo.call(this, m, u, ...r); };
+})();`
+
 // Script das janelas visíveis (login / resgatar): só avisa quem está logado.
 const kickLoginJS = `(() => {
  if (window.__farmL) return; window.__farmL = 1;
@@ -140,6 +164,7 @@ type kickPage struct {
 	loaded  bool // a página avisou que carregou (vigia de "abriu mas não carregou")
 	tries   int
 	url     string
+	netPts  bool // já recebeu o saldo pela rede: o número da tela deixa de valer
 }
 
 var (
@@ -285,9 +310,9 @@ func newKickPage(plat string, acct int, slug string, visible bool) *kickPage {
 	case plat == "tw":
 		ch.Init(twWatchJS)
 	case visible:
-		ch.Init(kickLoginJS)
+		ch.Init(kickNetJS + "\n" + kickLoginJS)
 	default:
-		ch.Init(kickWatchJS)
+		ch.Init(kickNetJS + "\n" + kickWatchJS)
 	}
 	u := "https://kick.com/"
 	if plat == "tw" {
@@ -322,6 +347,8 @@ func kickMessage(p *kickPage, m string) {
 		T    string `json:"t"`
 		N    *int   `json:"n"`
 		Name string `json:"name"`
+		U    string `json:"u"`
+		Mine bool   `json:"mine"`
 	}
 	if json.Unmarshal([]byte(m), &o) != nil {
 		return
@@ -330,16 +357,38 @@ func kickMessage(p *kickPage, m string) {
 		p.loaded = true
 		return
 	}
+	if o.T == "ptsurl" { // só para o registro: quais respostas de pontos a Kick mandou
+		n := "-"
+		if o.N != nil {
+			n = fmt.Sprint(*o.N)
+		}
+		mine := ""
+		if !o.Mine {
+			mine = " (outro canal)"
+		}
+		ptsLog(p, "rede vista", n, o.U+mine)
+		return
+	}
+	if o.T == "ptsnet" {
+		p.netPts = true
+		o.T = "pts"
+	} else if o.T == "pts" && p.netPts {
+		if o.N != nil {
+			ptsLog(p, "tela", fmt.Sprint(*o.N), "ignorado: já veio pela rede")
+		}
+		return
+	}
 	cfgMu.Lock()
 	var user *string
 	var pts *map[string]int
 	var at *map[string]int64
+	var resg *map[string]bool
 	if p.plat == "tw" {
 		a := &cfg.TwAccs[p.acct]
-		user, pts, at = &a.User, &a.Pts, &a.PtsAt
+		user, pts, at, resg = &a.User, &a.Pts, &a.PtsAt, &a.Resg
 	} else {
 		a := &cfg.KickAccs[p.acct]
-		user, pts, at = &a.User, &a.Pts, &a.PtsAt
+		user, pts, at, resg = &a.User, &a.Pts, &a.PtsAt, &a.Resg
 	}
 	switch o.T {
 	case "pts":
@@ -347,12 +396,38 @@ func kickMessage(p *kickPage, m string) {
 			if *pts == nil {
 				*pts = map[string]int{}
 			}
-			(*pts)[p.slug] = *o.N
-			if *at == nil {
-				*at = map[string]int64{}
+			if *resg == nil {
+				*resg = map[string]bool{}
 			}
-			(*at)[p.slug] = time.Now().Unix()
-			kDirty = true
+			old, had := (*pts)[p.slug]
+			src := "tela"
+			if p.netPts {
+				src = "rede"
+			}
+			keep := true
+			switch {
+			case p.visible: // janela aberta por você (resgatar): é o valor de verdade
+				(*resg)[p.slug] = true
+			case p.checker:
+				// canal offline não ganha pontos: depois de um resgate no app, um número
+				// MAIOR na conferência é valor velho da Kick, não pontos novos
+				if (*resg)[p.slug] && had && *o.N > old {
+					keep = false
+				}
+			default: // assistindo ao vivo: pode ter ganhado pontos de verdade
+				delete(*resg, p.slug)
+			}
+			if keep {
+				(*pts)[p.slug] = *o.N
+				if *at == nil {
+					*at = map[string]int64{}
+				}
+				(*at)[p.slug] = time.Now().Unix()
+				kDirty = true
+				ptsLog(p, src, fmt.Sprint(*o.N), fmt.Sprintf("antes %d", old))
+			} else {
+				ptsLog(p, src, fmt.Sprint(*o.N), fmt.Sprintf("ignorado: maior que %d depois do resgate", old))
+			}
 		}
 	case "user":
 		if o.Name != "" || !p.visible { // nas janelas visíveis só conta quando entrou
@@ -375,6 +450,30 @@ func kickMessage(p *kickPage, m string) {
 		}
 	}
 	onUpdate()
+}
+
+// ptsLog anota cada leitura de pontos em pontos.log (pasta do Farmador em
+// %LOCALAPPDATA%), para descobrir de onde veio um número errado.
+func ptsLog(p *kickPage, src, n, note string) {
+	kind := "ao vivo"
+	switch {
+	case p.visible:
+		kind = "janela"
+	case p.checker:
+		kind = "conferência"
+	}
+	path := filepath.Join(filepath.Dir(kickDataDir(0)), "pontos.log")
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	if st, err := os.Stat(path); err == nil && st.Size() > 512<<10 {
+		os.Rename(path, path+".old")
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	fmt.Fprintf(f, "%s  %-6s %-12s %-16s %-11s %8s  %s\n", time.Now().Format("2006-01-02 15:04:05"),
+		platName(p.plat), kind, p.slug, src, n, note)
+	f.Close()
 }
 
 // kickSync abre/fecha as páginas escondidas conforme as lives ao vivo e as contas ligadas.
