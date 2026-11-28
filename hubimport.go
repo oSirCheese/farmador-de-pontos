@@ -87,7 +87,7 @@ func importHub(path string) (string, error) {
 			continue
 		}
 		a := &cfg.TwAccs[slot]
-		a.Conta = c.Conta
+		a.Conta = nomeConta(c.Conta)
 		if c.Login != "" {
 			a.Login = c.Login
 		}
@@ -100,7 +100,7 @@ func importHub(path string) (string, error) {
 	for i := 0; i < nAccs && i < len(h.Kick.Contas); i++ {
 		c := h.Kick.Contas[i]
 		a := &cfg.KickAccs[i]
-		a.Conta = c.Conta
+		a.Conta = nomeConta(c.Conta)
 		if a.Pts == nil {
 			a.Pts = map[string]int{}
 		}
@@ -121,8 +121,22 @@ func importHub(path string) (string, error) {
 	return msg, nil
 }
 
+// nomeConta: só o nome mostrado muda; a conta continua a mesma (oSirCheese1 → oSirCheese).
+func nomeConta(s string) string {
+	if strings.EqualFold(strings.TrimSpace(s), "oSirCheese1") {
+		return "oSirCheese"
+	}
+	return s
+}
+
 // migrateV2 prepara a configuração antiga para a v2.0.
 func migrateV2() {
+	for i := range cfg.KickAccs { // v3.4.6: oSirCheese1 aparece como oSirCheese
+		cfg.KickAccs[i].Conta = nomeConta(cfg.KickAccs[i].Conta)
+	}
+	for i := range cfg.TwAccs {
+		cfg.TwAccs[i].Conta = nomeConta(cfg.TwAccs[i].Conta)
+	}
 	// v3.1: na Twitch os nomes das contas do jogo vieram invertidos do hub; usa os da Kick (mesma conta, mesmo número)
 	for i := range cfg.TwAccs {
 		if cfg.KickAccs[i].Conta != "" {
