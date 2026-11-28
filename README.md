@@ -7,13 +7,13 @@ App para Windows (um único `.exe`, feito em Go) que acompanha lives da **Kick**
 - Clicar num canal abre a live para resgatar.
 - Pode mandar frases no chat da Kick, **só** em canais de streamers que permitiram, pela API oficial da Kick.
 - Medidor de memória/CPU ("PESO AGORA").
-- Atualização automática: a cada 3 h confere o Release mais novo deste repositório e se instala sozinho. Um zip `farmador-osircheese-vX.Y.Z.zip` mais novo em Downloads ou na Área de Trabalho também é instalado sozinho.
+- Atualização automática: a cada 2 min confere o Release mais novo deste repositório e se instala sozinho. Um zip `farmador-osircheese-vX.Y.Z.zip` mais novo em Downloads ou na Área de Trabalho também é instalado sozinho.
 
 ## Publicar uma versão nova
 
 1. Suba `appVersion` em `main.go` e compile.
 2. Zipe o `.exe` como `farmador-osircheese-vX.Y.Z.zip`.
-3. `gh release create vX.Y.Z farmador-osircheese-vX.Y.Z.zip --title "vX.Y.Z"`: em até 3 h os Farmadores abertos se atualizam.
+3. `gh release create vX.Y.Z farmador-osircheese-vX.Y.Z.zip --title "vX.Y.Z"`: em até 2 min os Farmadores abertos se atualizam.
 
 ## Requisitos
 
