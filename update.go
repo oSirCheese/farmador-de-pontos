@@ -297,7 +297,7 @@ func scanUpdate() {
 var updTried = map[string]bool{}
 
 // ---------- atualizar sozinho pelos Releases do GitHub ----------
-// A cada 2 min pergunta ao GitHub qual é o Release mais novo. Se for mais novo que
+// A cada 3 h pergunta ao GitHub qual é o Release mais novo. Se for mais novo que
 // este, baixa o zip para a pasta do Farmador em %LOCALAPPDATA%; o scanUpdate acha
 // o zip lá e instala sozinho, igual ao zip em Downloads.
 
@@ -311,7 +311,7 @@ func ghUpdateLoop() {
 	time.Sleep(time.Minute) // deixa o Farmador abrir com calma
 	for {
 		ghCheckOnce()
-		time.Sleep(2 * time.Minute)
+		time.Sleep(3 * time.Hour)
 	}
 }
 
